@@ -1,0 +1,9 @@
+# This directory stores reference genome data files
+#
+# Common files to place here:
+# - GENCODE annotations (GTF files)
+# - Reference genome sequences (FASTA files)
+# - Conservation scores
+# - Other reference datasets
+#
+# Note: Files in this directory are mounted as read-only in JupyterHub

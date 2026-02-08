@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  jupyterhub:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    image: alphagenome-jupyterhub:latest
+    container_name: alphagenome-jupyterhub
+
+    # Port mapping
+    ports:
+      - "8000:8000"
+
+    # Environment variables
+    environment:
+      - ALPHAGENOME_API_KEY=${ALPHAGENOME_API_KEY}
+      - JUPYTER_ENABLE_LAB=yes
+
+    # Volume mounts
+    volumes:
+      # Shared resources (read-only)
+      - ./notebooks:/shared/notebooks:ro
+      - ./data:/shared/data:ro
+      - ./alphagenome_tools:/shared/tools:ro
+
+      # User data (read-write)
+      - jupyterhub-user-data:/home
+
+      # Configuration
+      - ./config/jupyterhub_config.py:/etc/jupyterhub/jupyterhub_config.py:ro
+
+    # Restart policy
+    restart: unless-stopped
+
+    # Resource limits (adjust based on your server)
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 8G
+        reservations:
+          cpus: '2'
+          memory: 4G
+
+    # Network
+    networks:
+      - alphagenome-net
+
+# Named volumes
+volumes:
+  jupyterhub-user-data:
+    driver: local
+
+# Network definition
+networks:
+  alphagenome-net:
+    driver: bridge

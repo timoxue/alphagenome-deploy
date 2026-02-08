@@ -1,0 +1,18 @@
+# This directory stores example datasets for tutorials and testing
+#
+# File formats supported:
+# - CSV files for variants/regions
+# - BED files for genomic intervals
+# - VCF files for genetic variants
+#
+# Example CSV format for variants:
+# chromosome,position,reference_bases,alternate_bases
+# chr22,36201698,A,C
+# chr22,36202000,G,T
+#
+# Example CSV format for intervals:
+# chromosome,start,end
+# chr22,35677410,36725986
+# chr21,33000000,34000000
+#
+# Note: Files in this directory are mounted as read-only in JupyterHub
