@@ -1,5 +1,7 @@
 # AlphaGenome JupyterHub Deployment
 
+**语言 / Language**: [中文](README_CN.md) | **English**
+
 A complete deployment solution for running AlphaGenome (Google DeepMind's genomic prediction model) in a corporate research environment using JupyterHub.
 
 ## Overview
@@ -341,3 +343,23 @@ For issues related to:
 **Version**: 1.0.0
 **Last Updated**: 2025-02-08
 **Maintained by**: Your Research IT Team
+
+## Documentation
+
+- **README.md** - English documentation
+- **README_CN.md** - 中文文档
+- **QUICKSTART.md** - Quick start guide (English)
+- **USER_GUIDE.md** - User guide (English)
+- **USER_GUIDE_CN.md** - 用户使用指南（中文）
+- **FILE_STRUCTURE.md** - File system structure
+
+## Related Links
+
+- 🌐 **GitHub Repository**: https://github.com/timoxue/alphagenome-deploy
+- 📖 **AlphaGenome Official Docs**: https://github.com/google-deepmind/alphagenome
+- 🐳 **Docker Documentation**: https://docs.docker.com/
+- 📚 **JupyterHub Documentation**: https://jupyterhub.readthedocs.io/
+
+---
+
+**Switch Language**: [English](README.md) | [中文](README_CN.md)
