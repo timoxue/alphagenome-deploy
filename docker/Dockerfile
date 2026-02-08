@@ -13,38 +13,41 @@ USER root
 # Install system packages
 RUN apt-get update && apt-get install -y \
     git \
-    vim \
-    curl \
-    wget \
-    && rm -rf /var/lib/apt/lists/*
+    python3-pip \
+    && rm -rf /var/lib/apt/lists/* || true
 
-# Switch back to jovyan user for Python packages
-USER jovyan
+# Create system users for JupyterHub
+# These users will be able to login
+# We create them without home dirs first, then create proper structure
+RUN for user in admin user1 user2 user3 user4 user5; do \
+      useradd -s /bin/bash $user && \
+      mkdir -p /home/$user && \
+      mkdir -p /home/$user/work/notebooks && \
+      mkdir -p /home/$user/work/results && \
+      mkdir -p /home/$user/work/data && \
+      mkdir -p /home/$user/work/figures && \
+      mkdir -p /home/$user/work/exports && \
+      chown -R $user:$user /home/$user; \
+    done
 
-# Install Python packages
-RUN pip install --no-cache-dir \
+# Install Python packages globally (will be available to all users)
+RUN pip3 install --no-cache-dir \
     alphagenome \
+    jupyterlab \
     matplotlib \
     seaborn \
     pandas \
     biopython \
     tqdm \
     openpyxl \
-    xlsxwriter \
-    ipywidgets && \
-    jupyter labextension install @jupyter-widgets/jupyterlab-manager
+    xlsxwriter
 
-# Copy custom tools library
-COPY alphagenome_tools /opt/alphagenome_tools
+# Copy custom tools library - create proper package structure
+RUN mkdir -p /opt/alphagenome_packages
+COPY alphagenome_tools /opt/alphagenome_packages/alphagenome_tools
 
-# Install the tools package (make it importable)
-RUN cd /opt/alphagenome_tools && \
-    pip install -e . || \
-    (echo "import sys; sys.path.insert(0, '/opt/alphagenome_tools')" >> \
-    /opt/conda/lib/python3.*/*/site-packages/usercustomize.py 2>/dev/null || \
-    mkdir -p /opt/conda/lib/python3.11/site-packages && \
-    echo "import sys; sys.path.insert(0, '/opt/alphagenome_tools')" >> \
-    /opt/conda/lib/python3.11/site-packages/usercustomize.py)
+# Make tools available via environment variable (will be set in jupyterhub_config.py)
+ENV PYTHONPATH="/opt/alphagenome_packages:$PYTHONPATH"
 
 # Copy example notebooks
 COPY notebooks /shared/notebooks
@@ -52,15 +55,11 @@ COPY notebooks /shared/notebooks
 # Create data directories structure
 RUN mkdir -p /shared/data/reference /shared/data/examples /shared/teamwork
 
-# Set working directory
-WORKDIR /home/jovyan/work
+# Set proper permissions
+RUN chmod -R a+rx /shared
 
 # Expose JupyterHub port
 EXPOSE 8000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8000/hub/api/ || exit 1
-
 # Start JupyterHub
-CMD ["jupyterhub", "-C", "/etc/jupyterhub/jupyterhub_config.py"]
+CMD ["jupyterhub", "--config", "/etc/jupyterhub/jupyterhub_config.py"]

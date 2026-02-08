@@ -10,7 +10,7 @@ import csv
 import logging
 from pathlib import Path
 from datetime import datetime
-from typing import List, Dict, Optional, Union
+from typing import List, Dict, Optional, Union, TYPE_CHECKING
 import pandas as pd
 
 # AlphaGenome imports
@@ -139,7 +139,7 @@ def monitor_api_quota(limit: int = 1000000, reset: bool = False) -> APIMonitor:
     return _api_monitor
 
 
-def load_variants_from_csv(filepath: Union[str, Path]) -> List[genome.Variant]:
+def load_variants_from_csv(filepath: Union[str, Path]) -> List['genome.Variant']:
     """
     Load variants from a CSV file.
 
@@ -172,7 +172,7 @@ def load_variants_from_csv(filepath: Union[str, Path]) -> List[genome.Variant]:
     return variants
 
 
-def load_intervals_from_csv(filepath: Union[str, Path]) -> List[genome.Interval]:
+def load_intervals_from_csv(filepath: Union[str, Path]) -> List['genome.Interval']:
     """
     Load genomic intervals from a CSV file.
 
@@ -205,9 +205,9 @@ def load_intervals_from_csv(filepath: Union[str, Path]) -> List[genome.Interval]
 
 
 def batch_predict_variants(
-    variants: List[genome.Variant],
+    variants: List['genome.Variant'],
     model,
-    interval: Optional[genome.Interval] = None,
+    interval: Optional['genome.Interval'] = None,
     ontology_terms: Optional[List[str]] = None,
     requested_outputs=None,
     show_progress: bool = True,
@@ -296,7 +296,7 @@ def batch_predict_variants(
 
 
 def batch_predict_sequences(
-    intervals: List[genome.Interval],
+    intervals: List['genome.Interval'],
     model,
     requested_outputs=None,
     show_progress: bool = True,

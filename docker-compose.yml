@@ -22,7 +22,6 @@ services:
       # Shared resources (read-only)
       - ./notebooks:/shared/notebooks:ro
       - ./data:/shared/data:ro
-      - ./alphagenome_tools:/shared/tools:ro
 
       # User data (read-write)
       - jupyterhub-user-data:/home

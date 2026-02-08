@@ -1,5 +1,6 @@
 """
 JupyterHub configuration for AlphaGenome deployment
+Multi-user setup with simple authentication for 2-5 users
 """
 
 import os
@@ -20,28 +21,51 @@ c.JupyterHub.port = 8000
 c.JupyterHub.bind_url = 'http://0.0.0.0:8000'
 
 # =============================================================================
-# Authentication
+# Authentication - Simple Dictionary Authenticator
 # =============================================================================
 
-# Use PAM authentication (Linux system users)
-# This is suitable for small teams on internal servers
-c.JupyterHub.authenticator_class = 'jupyterhub.auth.PAMAuthenticator'
+from jupyterhub.auth import Authenticator
 
-# Alternative: Simple local authentication (uncomment to use)
-# c.JupyterHub.authenticator_class = 'jupyterhub.auth.SimpleLocalAuthenticator'
+# Create a simple password-based authentication
+class DictionaryAuthenticator(Authenticator):
+    """
+    Simple dictionary-based authenticator for small teams.
+    Users and passwords are defined below.
+    """
 
-# Set admin users (comma-separated list)
-# These users can admin the JupyterHub server
+    # Define users and passwords here
+    # Format: 'username': 'password'
+    users = {
+        'admin': 'admin123',      # Administrator
+        'user1': 'user123',       # Team member 1
+        'user2': 'user123',       # Team member 2
+        'user3': 'user123',       # Team member 3
+        'user4': 'user123',       # Team member 4
+        'user5': 'user123',       # Team member 5
+    }
+
+    async def authenticate(self, handler, data):
+        """Authenticate user with username and password"""
+        username = data['username']
+        password = data['password']
+
+        if username in self.users and self.users[username] == password:
+            return username
+        return None
+
+# Use our custom authenticator
+c.JupyterHub.authenticator_class = DictionaryAuthenticator
+
+# Set admin users (these users can admin the JupyterHub server)
 c.JupyterHub.admin_users = {
     'admin',
-    'jovyan',
 }
 
 # =============================================================================
 # Spawner Configuration
 # =============================================================================
 
-# Use DockerSpawner for containerized user environments
+# Use LocalProcessSpawner (runs servers as local processes)
 c.JupyterHub.spawner_class = 'jupyterhub.spawner.LocalProcessSpawner'
 
 # Set default URL for user servers (opens JupyterLab by default)
@@ -55,6 +79,7 @@ c.Spawner.environment = {
     'ALPHAGENOME_API_KEY': os.environ.get('ALPHAGENOME_API_KEY', ''),
     'SHARED_DATA_PATH': '/shared/data',
     'SHARED_TOOLS_PATH': '/shared/tools',
+    'PYTHONPATH': '/opt/alphagenome_packages:/usr/lib/python3/dist-packages',
 }
 
 # Resource limits for each user container
@@ -64,8 +89,29 @@ c.Spawner.cpu_limit = 1.0
 # Automatically start user servers when they log in
 c.Spawner.start_timeout = 300
 
-# Allow users to create named servers (optional)
-c.Spawner.allow_named_servers = True
+# =============================================================================
+# User Server Configuration
+# =============================================================================
+
+# Set default working directory for all users
+c.Spawner.notebook_dir = '~/work'
+
+# Create user directories on first spawn
+def make_userdir(spawner):
+    """Create user home directory structure on first spawn"""
+    import os
+    import subprocess
+
+    user = spawner.user.name
+    home_dir = f'/home/{user}' if os.path.exists(f'/home/{user}') else f'/tmp/{user}'
+
+    # Create work directory structure
+    work_dir = os.path.join(home_dir, 'work')
+    for subdir in ['notebooks', 'results', 'data', 'figures', 'exports']:
+        os.makedirs(os.path.join(work_dir, subdir), exist_ok=True)
+
+# Hook to create directories before spawn
+c.Spawner.pre_spawn_hook = make_userdir
 
 # =============================================================================
 # Services
@@ -127,3 +173,15 @@ c.JupyterHub.cleanup_proxy = True
 
 # Maximum number of servers per user
 c.Spawner.active_server_limit = 5
+
+# =============================================================================
+# User Management
+# =============================================================================
+
+# Admin users can manage the JupyterHub server
+c.JupyterHub.admin_users = {
+    'admin',
+}
+
+# Disable user self-registration (users must be in the dictionary)
+# Only users defined in DictionaryAuthenticator.users can log in
