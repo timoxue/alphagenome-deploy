@@ -208,6 +208,7 @@ def batch_predict_variants(
     variants: List['genome.Variant'],
     model,
     interval: Optional['genome.Interval'] = None,
+    window_size: int = 131072,  # Default to model-supported size
     ontology_terms: Optional[List[str]] = None,
     requested_outputs=None,
     show_progress: bool = True,
@@ -219,7 +220,9 @@ def batch_predict_variants(
     Args:
         variants: List of genome.Variant objects
         model: AlphaGenome model instance (from dna_client.create())
-        interval: Genomic interval for predictions (optional)
+        interval: Genomic interval for predictions (optional, overrides window_size)
+        window_size: Size of window around each variant (default: 131072)
+                    Must be one of: 16384, 131072, 524288, 1048576
         ontology_terms: List of ontology terms (e.g., ['UBERON:0001157'])
         requested_outputs: List of output types (e.g., [dna_client.OutputType.RNA_SEQ])
         show_progress: Show progress bar if tqdm is available
@@ -228,8 +231,12 @@ def batch_predict_variants(
     Returns:
         DataFrame with prediction results
     """
+    # Import genome module locally to avoid None reference
+    from alphagenome.data import genome as genome_module
+    from alphagenome.models import dna_client as client
+    
     if requested_outputs is None:
-        requested_outputs = [client_module.OutputType.RNA_SEQ]
+        requested_outputs = [client.OutputType.RNA_SEQ]
 
     if ontology_terms is None:
         ontology_terms = []
@@ -241,17 +248,18 @@ def batch_predict_variants(
         try:
             # If interval not provided, create one around the variant
             if interval is None:
-                # Create 100kb window around variant
-                window_size = 100000
-                interval = genome.Interval(
+                # Create window around variant with specified size
+                var_interval = genome_module.Interval(
                     chromosome=variant.chromosome,
-                    position=max(0, variant.position - window_size // 2),
+                    start=max(0, variant.position - window_size // 2),
                     end=variant.position + window_size // 2
                 )
+            else:
+                var_interval = interval
 
             # Run prediction
             outputs = model.predict_variant(
-                interval=interval,
+                interval=var_interval,
                 variant=variant,
                 ontology_terms=ontology_terms,
                 requested_outputs=requested_outputs
@@ -298,6 +306,7 @@ def batch_predict_variants(
 def batch_predict_sequences(
     intervals: List['genome.Interval'],
     model,
+    ontology_terms=None,
     requested_outputs=None,
     show_progress: bool = True,
     monitor: bool = True
@@ -308,6 +317,7 @@ def batch_predict_sequences(
     Args:
         intervals: List of genome.Interval objects
         model: AlphaGenome model instance
+        ontology_terms: Optional list of ontology terms
         requested_outputs: List of output types
         show_progress: Show progress bar
         monitor: Track API usage
@@ -315,26 +325,49 @@ def batch_predict_sequences(
     Returns:
         DataFrame with prediction results
     """
+    # Import here to avoid issues with module-level import failures
+    from alphagenome.models import dna_client as dc
+    
+    if ontology_terms is None:
+        ontology_terms = ['UBERON:0001157']  # Default tissue type
+    
     if requested_outputs is None:
-        requested_outputs = [client_module.OutputType.RNA_SEQ]
+        requested_outputs = [dc.OutputType.RNA_SEQ]
 
     results = []
     iterator = tqdm(intervals, desc="Predicting sequences") if (show_progress and tqdm) else intervals
 
     for interval in iterator:
+        result = {
+            'chromosome': interval.chromosome,
+            'start': interval.start,
+            'end': interval.end,
+            'length': interval.end - interval.start,
+            'success': False,
+            'error': None
+        }
+        
         try:
-            outputs = model.predict_sequence(
+            outputs = model.predict_interval(
                 interval=interval,
+                ontology_terms=ontology_terms,
                 requested_outputs=requested_outputs
             )
 
-            result = {
-                'chromosome': interval.chromosome,
-                'start': interval.start,
-                'end': interval.end,
-                'length': interval.end - interval.start,
-                'success': True,
-            }
+            # Extract RNA-seq data if available
+            # Note: predict_interval returns TrackData directly, not mean_profile
+            if hasattr(outputs, 'rna_seq') and outputs.rna_seq is not None:
+                rna_data = outputs.rna_seq  # This is TrackData
+                # TrackData has .values attribute which is the data array
+                if hasattr(rna_data, 'values'):
+                    result['mean_expression'] = float(rna_data.values.mean())
+                    result['max_expression'] = float(rna_data.values.max())
+                    result['data_points'] = len(rna_data.values)
+                    result['success'] = True
+                else:
+                    result['error'] = 'RNA-seq data has no values attribute'
+            else:
+                result['error'] = 'No RNA-seq data returned'
 
             results.append(result)
 
@@ -343,14 +376,9 @@ def batch_predict_sequences(
 
         except Exception as e:
             logger.error(f"Error predicting interval {interval.chromosome}:{interval.start}-{interval.end}: {e}")
-            results.append({
-                'chromosome': interval.chromosome,
-                'start': interval.start,
-                'end': interval.end,
-                'length': interval.end - interval.start,
-                'success': False,
-                'error': str(e)
-            })
+            result['error'] = str(e)
+            results.append(result)
+
 
     df = pd.DataFrame(results)
     logger.info(f"Completed {len(df)} sequence predictions ({df['success'].sum()} successful)")
